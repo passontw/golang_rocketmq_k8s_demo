@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rocketmq-producer
+  namespace: rocketmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rocketmq-producer
+  template:
+    metadata:
+      labels:
+        app: rocketmq-producer
+    spec:
+      containers:
+      - name: rocketmq-producer
+        image: rocketmq-producer:latest
+        imagePullPolicy: Never
+        env:
+        - name: ROCKETMQ_NAMESERVER
+          value: "rocketmq-namesrv:9876"
+        - name: ROCKETMQ_TOPIC
+          value: "test-topic"
+        - name: ROCKETMQ_GROUP
+          value: "producer-group"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m" 

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rocketmq-consumer
+  namespace: rocketmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rocketmq-consumer
+  template:
+    metadata:
+      labels:
+        app: rocketmq-consumer
+    spec:
+      containers:
+      - name: rocketmq-consumer
+        image: rocketmq-consumer:latest
+        imagePullPolicy: Never
+        env:
+        - name: ROCKETMQ_NAMESERVER
+          value: "rocketmq-namesrv:9876"
+        - name: ROCKETMQ_TOPIC
+          value: "test-topic"
+        - name: ROCKETMQ_GROUP
+          value: "consumer-group"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m" 

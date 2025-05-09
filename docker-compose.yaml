@@ -1,0 +1,65 @@
+services:
+  # RocketMQ 名稱服務器
+  namesrv:
+    image: apache/rocketmq:5.1.4
+    container_name: rocketmq-namesrv
+    command: sh mqnamesrv
+    ports:
+      - "9876:9876"
+    environment:
+      - JAVA_OPT=-Duser.home=/opt
+    networks:
+      - rocketmq-network
+
+  # RocketMQ Broker
+  broker:
+    image: apache/rocketmq:5.1.4
+    container_name: rocketmq-broker
+    command: sh mqbroker -n rocketmq-namesrv:9876 -c /opt/broker.conf
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+    environment:
+      - JAVA_OPT=-Duser.home=/opt
+    volumes:
+      - ./conf/broker.conf:/opt/broker.conf
+      - ./data/broker/logs:/home/rocketmq/logs
+      - ./data/broker/store:/home/rocketmq/store
+    depends_on:
+      - namesrv
+    networks:
+      - rocketmq-network
+
+  # 生產者服務
+  producer:
+    build:
+      context: .
+      dockerfile: build/producer/Dockerfile
+    container_name: rocketmq-producer
+    environment:
+      - ROCKETMQ_NAMESERVER=172.26.0.2:9876
+      - ROCKETMQ_TOPIC=test-topic
+      - ROCKETMQ_GROUP=producer-group
+    depends_on:
+      - broker
+    networks:
+      - rocketmq-network
+
+  # 消費者服務
+  consumer:
+    build:
+      context: .
+      dockerfile: build/consumer/Dockerfile
+    container_name: rocketmq-consumer
+    environment:
+      - ROCKETMQ_NAMESERVER=172.26.0.2:9876
+      - ROCKETMQ_TOPIC=test-topic
+      - ROCKETMQ_GROUP=consumer-group
+    depends_on:
+      - broker
+    networks:
+      - rocketmq-network
+
+networks:
+  rocketmq-network:
+    driver: bridge 
