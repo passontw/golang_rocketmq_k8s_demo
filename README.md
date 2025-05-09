@@ -391,6 +391,112 @@ Istio 提供兩種部署模式:傳統的 Sidecar 模式和較新的 Ambient 模�
 
 無論選擇哪種模式，**解決 Go 客戶端的 DNS 問題仍需使用 `http://` 前綴方法**。
 
+## 多 NameServer 架構的負載平衡解決方案
+
+在生產環境中，部署多個 NameServer 實例以提高可用性是常見做法。以下是幾種在 Kubernetes 環境中實現 RocketMQ NameServer 負載均衡的方法：
+
+### 1. 客戶端層面的負載平衡
+
+RocketMQ Go 客戶端支持使用逗號分隔多個 NameServer 地址：
+
+```yaml
+env:
+- name: ROCKETMQ_NAMESERVER
+  value: "http://rocketmq-namesrv-0.rocketmq-namesrv.rocketmq.svc.cluster.local:9876,http://rocketmq-namesrv-1.rocketmq-namesrv.rocketmq.svc.cluster.local:9876"
+```
+
+客戶端會隨機選擇一個進行連接，並在連接失敗時自動嘗試下一個地址。
+
+**注意**: 每個地址都需要添加 `http://` 前綴以解決 DNS 解析問題。
+
+### 2. 使用 StatefulSet 和 Headless Service
+
+將 NameServer 部署改為 StatefulSet 以獲得穩定的網絡標識：
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: rocketmq-namesrv
+  namespace: rocketmq
+spec:
+  clusterIP: None  # Headless Service
+  ports:
+  - port: 9876
+    targetPort: 9876
+  selector:
+    app: rocketmq-namesrv
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rocketmq-namesrv
+  namespace: rocketmq
+spec:
+  serviceName: "rocketmq-namesrv"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rocketmq-namesrv
+  template:
+    # ... 容器配置
+```
+
+然後客戶端可以使用服務名稱連接：
+
+```yaml
+env:
+- name: ROCKETMQ_NAMESERVER
+  value: "http://rocketmq-namesrv.rocketmq.svc.cluster.local:9876"
+```
+
+Kubernetes 會自動將請求分發到不同的 Pod。
+
+### 3. 使用 Istio 實現高級負載均衡
+
+配置 DestinationRule 可以提供更智能的負載均衡策略：
+
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: rocketmq-namesrv
+  namespace: rocketmq
+spec:
+  host: rocketmq-namesrv.rocketmq.svc.cluster.local
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+```
+
+### 4. Broker 配置相應調整
+
+Broker 也需要連接到所有 NameServer：
+
+```yaml
+command: ["sh", "-c", "/home/rocketmq/rocketmq-5.1.4/bin/mqbroker -n http://rocketmq-namesrv-0.rocketmq-namesrv.rocketmq.svc.cluster.local:9876,http://rocketmq-namesrv-1.rocketmq-namesrv.rocketmq.svc.cluster.local:9876 -c /etc/rocketmq/broker.conf"]
+```
+
+或使用服務名稱:
+
+```yaml
+command: ["sh", "-c", "/home/rocketmq/rocketmq-5.1.4/bin/mqbroker -n http://rocketmq-namesrv.rocketmq.svc.cluster.local:9876 -c /etc/rocketmq/broker.conf"]
+```
+
+### 生產環境最佳實踐
+
+1. **部署至少 3 個 NameServer 副本**
+2. **使用節點親和性規則確保跨節點分佈**
+3. **實施監控和告警機制**
+4. **確保每個地址都添加 `http://` 前綴**
+
 ## 配置文件說明
 
 ### rocketmq-namespace.yaml
