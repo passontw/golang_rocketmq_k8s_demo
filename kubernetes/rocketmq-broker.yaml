@@ -12,11 +12,13 @@ spec:
     metadata:
       labels:
         app: rocketmq-broker
+      annotations:
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
       - name: rocketmq-broker
         image: apache/rocketmq:5.1.4
-        command: ["sh", "-c", "/home/rocketmq/rocketmq-5.1.4/bin/mqbroker -n rocketmq-namesrv:9876 -c /etc/rocketmq/broker.conf"]
+        command: ["sh", "-c", "/home/rocketmq/rocketmq-5.1.4/bin/mqbroker -n rocketmq-namesrv.rocketmq.svc.cluster.local:9876 -c /etc/rocketmq/broker.conf"]
         env:
         - name: JAVA_OPT_EXT
           value: "-server -Xms1g -Xmx1g"

@@ -12,14 +12,16 @@ spec:
     metadata:
       labels:
         app: rocketmq-consumer
+      annotations:
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
       - name: rocketmq-consumer
-        image: rocketmq-consumer:latest
-        imagePullPolicy: Never
+        image: passon/rocketmq-consumer:latest
+        imagePullPolicy: IfNotPresent
         env:
         - name: ROCKETMQ_NAMESERVER
-          value: "rocketmq-namesrv:9876"
+          value: "http://rocketmq-namesrv.rocketmq.svc.cluster.local:9876"
         - name: ROCKETMQ_TOPIC
           value: "test-topic"
         - name: ROCKETMQ_GROUP

@@ -12,6 +12,8 @@ spec:
     metadata:
       labels:
         app: rocketmq-namesrv
+      annotations:
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
       - name: rocketmq-namesrv
